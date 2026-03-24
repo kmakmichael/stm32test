@@ -23,9 +23,12 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
+uint32_t BAUD_RATE = 4; //9600;
+uint32_t HCLK_FREQ = 170000000;
 
 void SystemClock_Config(void);
 void GPIO_Setup(void);
+void Timer_Setup(void);
 
 int main(void)
 {
@@ -33,17 +36,17 @@ int main(void)
 	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
 	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
 	NVIC_SetPriorityGrouping((uint32_t)0x00000003); // Priority Group 4
+	NVIC_EnableIRQ(TIM3_IRQn);
 	LL_PWR_DisableUCPDDeadBattery();
 	SystemClock_Config();
 
 	GPIO_Setup();
+	Timer_Setup();
 
-	while(1) {
-		LL_GPIO_ResetOutputPin(GPIOA, LL_GPIO_PIN_5);
-		LL_mDelay(400);
-		LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_5);
-		LL_mDelay(10);
-	}
+	LL_TIM_EnableCounter(TIM3);
+
+	// do nothing, all the juice happens from timer interrupts
+	while(1) {};
 }
 
 
@@ -56,22 +59,54 @@ int main(void)
  * 	Rx:	PA6		CN10 p13
  * 	G:	n/a 	CN10 p9
  * 	5V: n/a		CN7  p18
+ *
  */
-
 void GPIO_Setup(void) {
 	// enable clock
 	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
 
+	// PA5: Tx / USRLED
 	LL_GPIO_InitTypeDef initStruct = {
 			LL_GPIO_PIN_5,
 			LL_GPIO_MODE_OUTPUT,
 			LL_GPIO_OUTPUT_PUSHPULL,
 			LL_GPIO_SPEED_FREQ_LOW,
-			LL_GPIO_PULL_DOWN,
+			LL_GPIO_PULL_UP,
 			LL_GPIO_AF_0,
 	};
 	LL_GPIO_Init(GPIOA, &initStruct);
+
+	// PA6: Rx
+	initStruct.Pin = LL_GPIO_PIN_6;
+	initStruct.Mode = LL_GPIO_MODE_INPUT;
+	LL_GPIO_Init(GPIOA, &initStruct);
 }
+
+
+/*
+ * Timer Setup:
+ * 	TIM3: UART Tx
+ * 	TIM4: UART Rx
+ *
+ * 	consider switching to TIM 2 & 5 later,
+ * 	32-bit register might help with variable baud rates
+ */
+void Timer_Setup(void) {
+	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM3 /*^ LL_APB1_GRP1_PERIPH_TIM4*/);
+
+	LL_TIM_InitTypeDef TIM_InitStruct;
+	LL_TIM_StructInit(&TIM_InitStruct);
+
+	// apparently __LL_TIM_CALC_PSC exists ?
+	TIM_InitStruct.Prescaler = __LL_TIM_CALC_PSC(HCLK_FREQ, BAUD_RATE);
+	// uint32_t cyclesPerSecond = HCLK_FREQ / TIM_InitStruct.Prescaler;
+	TIM_InitStruct.Autoreload = __LL_TIM_CALC_ARR(HCLK_FREQ, TIM_InitStruct.Prescaler, BAUD_RATE);
+	LL_TIM_Init(TIM3, &TIM_InitStruct);
+	LL_TIM_EnableARRPreload(TIM3);
+	LL_TIM_EnableIT_UPDATE(TIM3);
+	LL_TIM_ClearFlag_UPDATE(TIM3);
+}
+
 
 /*
  * System Clock Configuration
@@ -114,7 +149,15 @@ void SystemClock_Config(void)
 	LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_1);
 	LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
 
-	LL_Init1msTick(170000000);
+	LL_Init1msTick(HCLK_FREQ);
 
-	LL_SetSystemCoreClock(170000000);
+	LL_SetSystemCoreClock(HCLK_FREQ);
+}
+
+/*
+ * TIM3 Interrupt Handler
+ */
+void TIM3_IRQHandler(void) {
+	LL_GPIO_TogglePin(GPIOA, LL_GPIO_PIN_5);
+	LL_TIM_ClearFlag_UPDATE(TIM3);
 }

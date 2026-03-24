@@ -14,6 +14,9 @@ extern "C" {
 #include "stm32g4xx_ll_pwr.h"
 #include "stm32g4xx_ll_rcc.h"
 #include "stm32g4xx_ll_gpio.h"
+#include "stm32g4xx_ll_tim.h"
+
+void TIM3_IRQHandler(void);
 
 #ifdef __cplusplus
 }
