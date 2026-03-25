@@ -5,8 +5,7 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <stdbool.h>
+#include <stdint.h> // should i be using inttypes.h ?
 
 #include "stm32g4xx_ll_tim.h"
 #include "stm32g4xx_ll_gpio.h"
@@ -20,8 +19,6 @@ extern "C" {
 #define rx_busclk LL_APB1_GRP1_PERIPH_TIM4
 #define rx_pin LL_GPIO_PIN_6
 
-#define BUF_SIZE 4
-
 enum packet_stage {
 	NONE, // not transmitting anything
 	START, // sending the start frame
@@ -31,9 +28,9 @@ enum packet_stage {
 };
 
 void UART_Setup(void);
-void Timer_Setup(void);
-void GPIO_Setup(void);
-void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud);
+
+void UART_TransmitMessageAsync(void *buffer, uint8_t length);
+void UART_RecvMessageAsync(void *buffer, uint8_t length);
 
 // Interrupt handlers
 void TIM3_IRQHandler(void);

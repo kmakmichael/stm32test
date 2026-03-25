@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <string.h>
 
 #include "stm32g4xx_ll_system.h"
 #include "stm32g4xx_ll_cortex.h"

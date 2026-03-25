@@ -1,7 +1,22 @@
 #include "uart.h"
 
+
+void GPIO_Setup();
+void Timer_Setup();
+void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud);
+
 // eventually can be variable or even set by the other transmitter
 static const uint32_t BAUD_RATE = 9600;
+
+/* transmission buffer */
+void *tx_buf;
+uint8_t *tx_seek;
+uint8_t tx_len = 0; // size_t on the system is probably 32 but whatever, limit it to 8.
+
+/* recv buffer */
+void *rx_buf;
+uint8_t *rx_seek;
+uint8_t rx_len = 0;
 
 // for now: send this on repeat
 uint8_t sending = 0b01010101;
@@ -9,9 +24,6 @@ uint8_t sending = 0b01010101;
 void UART_Setup() {
 	Timer_Setup();
 	GPIO_Setup();
-
-	LL_TIM_EnableCounter(tx_timer);
-	LL_TIM_EnableCounter(rx_timer);
 }
 
 void Timer_Setup() {
@@ -61,6 +73,22 @@ void GPIO_Setup() {
 }
 
 
+// probably should return that ErrorStatus struct the other functions do
+// if you're using void then you have to consider the size of different data types in bufsize
+// or leave it up to the caller ?
+void UART_TransmitMessageAsync(void *buffer, uint8_t length) {
+	tx_buf = buffer; // i guess you have to pray nobody messes with your buffer while you're transmitting ? maybe copy it instead ?
+	tx_seek = tx_buf;
+	tx_len = length;
+
+	LL_TIM_EnableCounter(tx_timer);
+}
+
+void UART_RecvMessageAsync(void *buffer, uint8_t length) {
+
+}
+
+
 /*
  * Set timers to a certain baud rate
  * 	(is there a "right" way to balance prescaler and autoreload?)
@@ -81,9 +109,6 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
 uint8_t tx_mask = 0x01;
 uint8_t tx_parity = 0;
 enum packet_stage tx_stage = NONE;
-// uint8_t tx_buf[BUF_SIZE];
-uint8_t tx_buf[] = { 0x03, 0x6f, 0x2B, 0xff};
-uint8_t *tx_bufptr = tx_buf;
 /*
  * TIM3 Interrupt Handler: Tx cycle
  */
@@ -96,16 +121,24 @@ void TIM3_IRQHandler(void) {
 	switch (tx_stage) {
 	case NONE:
 		LL_GPIO_SetOutputPin(GPIOA, tx_pin); // just make sure we're on HI
-		tx_stage = START;
+		if (tx_seek > tx_buf + tx_len) { // if we're done with our data, stop
+			tx_len = 0;
+			LL_TIM_DisableCounter(tx_timer);
+			// do something with tx_seek ?
+			break; // probably not necessary but it feels safer to wait a cycle before checking for more data
+		}
+		if (tx_len > 0) {
+			tx_stage = START;
+		}
 		break;
 	case START: // 1 cycle of LO
 		LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
 		tx_mask = 0x01;
-		tx_stage = DATA;
 		tx_parity = 0x00;
+		tx_stage = DATA;
 		break;
 	case DATA: // 8 cycles of bits
-		uint8_t bit = *tx_bufptr & tx_mask;
+		uint8_t bit = *tx_seek & tx_mask;
 		(bit) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin); // one : zero
 		if (bit) {
 			++tx_parity;
@@ -118,10 +151,7 @@ void TIM3_IRQHandler(void) {
 	case PARITY: // 1 cycle of parity
 		(tx_parity & 0x01) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin); // odd : even
 		// walk the buffer pointer along
-		++tx_bufptr;
-		if (tx_bufptr - tx_buf >= BUF_SIZE) {
-			tx_bufptr = tx_buf;
-		}
+		++tx_seek;
 		tx_parity = 0xFF;
 		tx_stage = STOP;
 		break;
@@ -138,8 +168,7 @@ void TIM3_IRQHandler(void) {
 
 uint8_t rx_mask = 0x01;
 enum packet_stage rx_stage = NONE;
-uint8_t rx_buf[BUF_SIZE];
-uint8_t *rx_bufptr = rx_buf;
+void *rx_bufptr;
 /*
  * TIM4 Interrupt Handler: Rx cycle
  */
