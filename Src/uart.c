@@ -79,20 +79,50 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
 
 
 /*
- * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 2 stop
+ * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 2 stop LOW
  */
+// TODO: structify this ?
 uint8_t tx_mask = 0x01;
+uint8_t tx_parity = 0;
+enum packet_stage tx_stage = NONE;
 /*
  * TIM3 Interrupt Handler: Tx cycle
  */
 void TIM3_IRQHandler(void) {
-	if (tx_mask == 0) {
+	switch (tx_stage) {
+	case NONE:
+		LL_GPIO_SetOutputPin(GPIOA, tx_pin); // just make sure we're on HI
+		if (queue_size > 0) {
+			tx_stage = START;
+		}
+		break;
+	case START: // 1 cycle of LO
+		LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
 		tx_mask = 0x01;
-	} else {
+		tx_stage = DATA;
+		tx_parity = 0x0;
+		break;
+	case DATA: // 8 cycles of bits
 		uint8_t bit = sending & tx_mask;
 		(bit) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
+		if (bit) {
+			++tx_parity;
+		}
 		tx_mask <<= 1;
-
+		if (tx_mask == 0) {
+			tx_stage = PARITY;
+		}
+		break;
+	case PARITY: // 1 cycle of parity
+		(tx_parity & 0x01) ? LL_GPIO_ResetOutputPin(GPIOA, tx_pin) : LL_GPIO_SetOutputPin(GPIOA, tx_pin);
+		tx_stage = STOP;
+		break;
+	case STOP: // 2 cycles of HI (1 here, 1 as NONE)
+		LL_GPIO_SetOutputPin(GPIOA, tx_pin);
+		tx_stage = NONE;
+		break;
+	default: // some kind of error ? maybe jump into an error handler ?
+		break;
 	}
 	LL_TIM_ClearFlag_UPDATE(TIM3);
 }
