@@ -2,6 +2,16 @@
 
 static const uint32_t BAUD_RATE = 9600;
 
+// plans: fill buffer and walk buf_ptr along, use
+// queue_size to track whats left to write
+
+// static const uint8_t BUF_SIZE = 16;
+// uint8_t buf[BUF_SIZE];
+// unit8_t *buf_ptr;
+uint8_t queue_size = 16;
+
+// for now: send this on repeat
+uint8_t sending = 'a';
 
 void UART_Setup() {
 	Timer_Setup();
@@ -17,8 +27,6 @@ void Timer_Setup() {
 
 	LL_TIM_InitTypeDef TIM_InitStruct;
 	LL_TIM_StructInit(&TIM_InitStruct);
-	TIM_InitStruct.Prescaler = __LL_TIM_CALC_PSC(SystemCoreClock, 1000 * BAUD_RATE);
-	TIM_InitStruct.Autoreload = __LL_TIM_CALC_ARR(SystemCoreClock, TIM_InitStruct.Prescaler, BAUD_RATE);
 
 	// TIM3: Tx
 	NVIC_SetPriority(tx_irqn, 0);
@@ -52,7 +60,7 @@ void GPIO_Setup() {
 
 	// PA6: Rx
 	initStruct.Pin = rx_pin;
-	// initStruct.Mode = LL_GPIO_MODE_INPUT;
+	initStruct.Mode = LL_GPIO_MODE_INPUT;
 	LL_GPIO_Init(GPIOA, &initStruct);
 }
 
@@ -71,13 +79,26 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
 
 
 /*
+ * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 2 stop
+ */
+uint8_t tx_mask = 0x01;
+/*
  * TIM3 Interrupt Handler: Tx cycle
  */
 void TIM3_IRQHandler(void) {
-	LL_GPIO_TogglePin(GPIOA, tx_pin);
+	if (tx_mask == 0) {
+		tx_mask = 0x01;
+	} else {
+		uint8_t bit = sending & tx_mask;
+		(bit) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
+		tx_mask <<= 1;
+
+	}
 	LL_TIM_ClearFlag_UPDATE(TIM3);
 }
 
+
+uint8_t rx_mask = 0x01;
 /*
  * TIM4 Interrupt Handler: Rx cycle
  */
@@ -85,3 +106,4 @@ void TIM4_IRQHandler(void) {
 	LL_GPIO_TogglePin(GPIOA, rx_pin);
 	LL_TIM_ClearFlag_UPDATE(TIM4);
 }
+

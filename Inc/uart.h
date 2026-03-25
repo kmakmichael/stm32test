@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "stm32g4xx_ll_tim.h"
 #include "stm32g4xx_ll_gpio.h"
