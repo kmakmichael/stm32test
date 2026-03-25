@@ -11,7 +11,7 @@ static const uint32_t BAUD_RATE = 9600;
 uint8_t queue_size = 16;
 
 // for now: send this on repeat
-uint8_t sending = 'a';
+uint8_t sending = 0b01010101;
 
 void UART_Setup() {
 	Timer_Setup();
@@ -100,11 +100,11 @@ void TIM3_IRQHandler(void) {
 		LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
 		tx_mask = 0x01;
 		tx_stage = DATA;
-		tx_parity = 0x0;
+		tx_parity = 0x00;
 		break;
 	case DATA: // 8 cycles of bits
 		uint8_t bit = sending & tx_mask;
-		(bit) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
+		(bit) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin); // one : zero
 		if (bit) {
 			++tx_parity;
 		}
@@ -114,7 +114,7 @@ void TIM3_IRQHandler(void) {
 		}
 		break;
 	case PARITY: // 1 cycle of parity
-		(tx_parity & 0x01) ? LL_GPIO_ResetOutputPin(GPIOA, tx_pin) : LL_GPIO_SetOutputPin(GPIOA, tx_pin);
+		(tx_parity & 0x01) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin); // odd : even
 		tx_stage = STOP;
 		break;
 	case STOP: // 2 cycles of HI (1 here, 1 as NONE)
