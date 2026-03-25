@@ -1,14 +1,7 @@
 #include "uart.h"
 
+// eventually can be variable or even set by the other transmitter
 static const uint32_t BAUD_RATE = 9600;
-
-// plans: fill buffer and walk buf_ptr along, use
-// queue_size to track whats left to write
-
-// static const uint8_t BUF_SIZE = 16;
-// uint8_t buf[BUF_SIZE];
-// unit8_t *buf_ptr;
-uint8_t queue_size = 16;
 
 // for now: send this on repeat
 uint8_t sending = 0b01010101;
@@ -19,8 +12,6 @@ void UART_Setup() {
 
 	LL_TIM_EnableCounter(tx_timer);
 	LL_TIM_EnableCounter(rx_timer);
-
-	LL_GPIO_TogglePin(GPIOA, rx_pin);
 }
 
 void Timer_Setup() {
@@ -62,6 +53,11 @@ void GPIO_Setup() {
 	initStruct.Pin = rx_pin;
 	initStruct.Mode = LL_GPIO_MODE_INPUT;
 	LL_GPIO_Init(GPIOA, &initStruct);
+
+	// PA7: debug signal
+	initStruct.Pin = LL_GPIO_PIN_7;
+	initStruct.Mode = LL_GPIO_MODE_OUTPUT;
+	LL_GPIO_Init(GPIOA, &initStruct);
 }
 
 
@@ -85,16 +81,22 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
 uint8_t tx_mask = 0x01;
 uint8_t tx_parity = 0;
 enum packet_stage tx_stage = NONE;
+// uint8_t tx_buf[BUF_SIZE];
+uint8_t tx_buf[] = { 0x03, 0x6f, 0x2B, 0xff};
+uint8_t *tx_bufptr = tx_buf;
 /*
  * TIM3 Interrupt Handler: Tx cycle
  */
 void TIM3_IRQHandler(void) {
+	if (tx_stage == NONE) {
+		LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_7);
+	} else {
+		LL_GPIO_ResetOutputPin(GPIOA, LL_GPIO_PIN_7);
+	}
 	switch (tx_stage) {
 	case NONE:
 		LL_GPIO_SetOutputPin(GPIOA, tx_pin); // just make sure we're on HI
-		if (queue_size > 0) {
-			tx_stage = START;
-		}
+		tx_stage = START;
 		break;
 	case START: // 1 cycle of LO
 		LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
@@ -103,7 +105,7 @@ void TIM3_IRQHandler(void) {
 		tx_parity = 0x00;
 		break;
 	case DATA: // 8 cycles of bits
-		uint8_t bit = sending & tx_mask;
+		uint8_t bit = *tx_bufptr & tx_mask;
 		(bit) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin); // one : zero
 		if (bit) {
 			++tx_parity;
@@ -115,9 +117,15 @@ void TIM3_IRQHandler(void) {
 		break;
 	case PARITY: // 1 cycle of parity
 		(tx_parity & 0x01) ? LL_GPIO_SetOutputPin(GPIOA, tx_pin) : LL_GPIO_ResetOutputPin(GPIOA, tx_pin); // odd : even
+		// walk the buffer pointer along
+		++tx_bufptr;
+		if (tx_bufptr - tx_buf >= BUF_SIZE) {
+			tx_bufptr = tx_buf;
+		}
+		tx_parity = 0xFF;
 		tx_stage = STOP;
 		break;
-	case STOP: // 2 cycles of HI (1 here, 1 as NONE)
+	case STOP: // 2 cycles of HI (1 as STOP, 1 as NONE)
 		LL_GPIO_SetOutputPin(GPIOA, tx_pin);
 		tx_stage = NONE;
 		break;
@@ -129,6 +137,9 @@ void TIM3_IRQHandler(void) {
 
 
 uint8_t rx_mask = 0x01;
+enum packet_stage rx_stage = NONE;
+uint8_t rx_buf[BUF_SIZE];
+uint8_t *rx_bufptr = rx_buf;
 /*
  * TIM4 Interrupt Handler: Rx cycle
  */

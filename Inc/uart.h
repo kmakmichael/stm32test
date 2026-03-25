@@ -20,6 +20,8 @@ extern "C" {
 #define rx_busclk LL_APB1_GRP1_PERIPH_TIM4
 #define rx_pin LL_GPIO_PIN_6
 
+#define BUF_SIZE 4
+
 enum packet_stage {
 	NONE, // not transmitting anything
 	START, // sending the start frame
