@@ -1,6 +1,6 @@
 #include "uart.h"
 
-static const uint32_t BAUD_RATE = 2; //9600;
+static const uint32_t BAUD_RATE = 9600;
 
 
 void UART_Setup() {
@@ -17,19 +17,23 @@ void Timer_Setup() {
 
 	LL_TIM_InitTypeDef TIM_InitStruct;
 	LL_TIM_StructInit(&TIM_InitStruct);
-	TIM_InitStruct.Prescaler = __LL_TIM_CALC_PSC(SystemCoreClock, BAUD_RATE);
+	TIM_InitStruct.Prescaler = __LL_TIM_CALC_PSC(SystemCoreClock, 1000 * BAUD_RATE);
 	TIM_InitStruct.Autoreload = __LL_TIM_CALC_ARR(SystemCoreClock, TIM_InitStruct.Prescaler, BAUD_RATE);
 
 	// TIM3: Tx
+	NVIC_SetPriority(tx_irqn, 0);
 	NVIC_EnableIRQ(tx_irqn);
 	LL_TIM_Init(tx_timer, &TIM_InitStruct);
+	Set_BaudRate(tx_timer, BAUD_RATE);
 	LL_TIM_EnableARRPreload(tx_timer);
 	LL_TIM_EnableIT_UPDATE(tx_timer);
 	LL_TIM_ClearFlag_UPDATE(tx_timer);
 
 	// TIM4: Rx
+	NVIC_SetPriority(rx_irqn, 0);
 	NVIC_EnableIRQ(rx_irqn);
 	LL_TIM_Init(rx_timer, &TIM_InitStruct);
+	Set_BaudRate(rx_timer, BAUD_RATE);
 	LL_TIM_EnableARRPreload(rx_timer);
 	LL_TIM_EnableIT_UPDATE(rx_timer);
 	LL_TIM_ClearFlag_UPDATE(rx_timer);
@@ -40,7 +44,7 @@ void GPIO_Setup() {
 			tx_pin,
 			LL_GPIO_MODE_OUTPUT,
 			LL_GPIO_OUTPUT_PUSHPULL,
-			LL_GPIO_SPEED_FREQ_LOW,
+			LL_GPIO_SPEED_FREQ_MEDIUM,
 			LL_GPIO_PULL_UP,
 			LL_GPIO_AF_0,
 	};
@@ -53,8 +57,12 @@ void GPIO_Setup() {
 }
 
 
+/*
+ * Set timers to a certain baud rate
+ * 	(is there a "right" way to balance prescaler and autoreload?)
+ */
 void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
-	uint32_t prescale =__LL_TIM_CALC_PSC(SystemCoreClock, baud);
+	uint32_t prescale =__LL_TIM_CALC_PSC(SystemCoreClock, 1000 * baud);
 	uint32_t autoreload = __LL_TIM_CALC_ARR(SystemCoreClock, prescale, baud);
 	LL_TIM_SetPrescaler(timer, prescale);
 	LL_TIM_SetAutoReload(timer, autoreload);
