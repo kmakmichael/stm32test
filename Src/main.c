@@ -50,8 +50,8 @@ int main(void)
 	// do nothing, all the juice happens from timer interrupts
 	while(1) {
 		LL_mDelay(500);
-		char msg[] = "laputan machine";
-		UART_TransmitMessageAsync(msg, strlen(msg));
+		// char msg[] = "laputan machine";
+		// UART_TransmitMessageAsync(msg, strlen(msg));
 	};
 }
 

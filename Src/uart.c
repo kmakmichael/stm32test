@@ -198,6 +198,7 @@ void TIM4_IRQHandler(void) {
 	case STOP:
 		rx_stage = SETUP;
 		LL_TIM_DisableCounter(rx_timer);
+		UART_TransmitMessageAsync(rx_buf, 1);
 		break;
 	default:
 		break;
