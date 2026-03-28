@@ -8,18 +8,26 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud);
 // eventually can be variable or even set by the other transmitter
 static const uint32_t BAUD_RATE = 9600;
 
+// TODO: structify this ?
 /* transmission buffer */
 void *tx_buf;
 uint8_t *tx_seek;
 uint8_t tx_len = 0; // size_t on the system is probably 32 but whatever, limit it to 8.
+uint8_t tx_mask = 0x01;
+uint8_t tx_parity = 0;
+enum packet_stage tx_stage = SETUP;
 
 /* recv buffer */
 void *rx_buf;
 uint8_t *rx_seek;
 uint8_t rx_len = 0;
+uint8_t rx_bit = 0;
+uint8_t rx_parity = 0;
+enum packet_stage rx_stage = SETUP;
 
-// for now: send this on repeat
-uint8_t sending = 0b01010101;
+/*
+ * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 1 stop HI
+ */
 
 void UART_Setup() {
 	Timer_Setup();
@@ -87,6 +95,8 @@ void UART_TransmitMessageAsync(void *buffer, uint8_t length) {
 	tx_buf = buffer; // i guess you have to pray nobody messes with your buffer while you're transmitting ? maybe copy it instead ?
 	tx_seek = tx_buf;
 	tx_len = length;
+	tx_stage = START;
+	LL_TIM_GenerateEvent_UPDATE(rx_timer);
 	LL_TIM_EnableCounter(tx_timer);
 }
 
@@ -108,13 +118,6 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
 }
 
 
-/*
- * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 1 stop HI
- */
-// TODO: structify this ?
-uint8_t tx_mask = 0x01;
-uint8_t tx_parity = 0;
-enum packet_stage tx_stage = SETUP;
 /*
  * TIM3 Interrupt Handler: Tx cycle
  */
@@ -162,10 +165,6 @@ void TIM3_IRQHandler(void) {
 }
 
 
-uint8_t rx_bit = 0;
-uint8_t rx_parity = 0;
-enum packet_stage rx_stage = SETUP;
-void *rx_bufptr;
 /*
  * TIM4 Interrupt Handler: Rx cycle
  * currently operating on the assumption of 8 data bits plus parity
