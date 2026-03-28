@@ -24,10 +24,11 @@ uint8_t sending = 0b01010101;
 void UART_Setup() {
 	Timer_Setup();
 	GPIO_Setup();
+	rx_buf = calloc(256, 1);
+	rx_seek = rx_buf;
 }
 
 void Timer_Setup() {
-
 	LL_TIM_InitTypeDef TIM_InitStruct;
 	LL_TIM_StructInit(&TIM_InitStruct);
 
@@ -66,6 +67,12 @@ void GPIO_Setup() {
 	initStruct.Mode = LL_GPIO_MODE_INPUT;
 	LL_GPIO_Init(GPIOA, &initStruct);
 
+	// EXTI for Rx pin
+	LL_EXTI_EnableIT_0_31(rx_exti);
+	LL_EXTI_EnableFallingTrig_0_31(rx_exti);
+	NVIC_SetPriority(EXTI9_5_IRQn, 0);
+	NVIC_EnableIRQ(EXTI9_5_IRQn);
+
 	// PA7: debug signal
 	initStruct.Pin = LL_GPIO_PIN_7;
 	initStruct.Mode = LL_GPIO_MODE_OUTPUT;
@@ -80,10 +87,10 @@ void UART_TransmitMessageAsync(void *buffer, uint8_t length) {
 	tx_buf = buffer; // i guess you have to pray nobody messes with your buffer while you're transmitting ? maybe copy it instead ?
 	tx_seek = tx_buf;
 	tx_len = length;
-
 	LL_TIM_EnableCounter(tx_timer);
 }
 
+// probably an interrupt actually
 void UART_RecvMessageAsync(void *buffer, uint8_t length) {
 
 }
@@ -98,38 +105,23 @@ void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud) {
 	uint32_t autoreload = __LL_TIM_CALC_ARR(SystemCoreClock, prescale, baud);
 	LL_TIM_SetPrescaler(timer, prescale);
 	LL_TIM_SetAutoReload(timer, autoreload);
-	LL_TIM_GenerateEvent_UPDATE(timer);
 }
 
 
 /*
- * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 2 stop LOW
+ * Transmit sequence: 1 clock of LOW, then 8 of data, 1 parity, 1 stop HI
  */
 // TODO: structify this ?
 uint8_t tx_mask = 0x01;
 uint8_t tx_parity = 0;
-enum packet_stage tx_stage = NONE;
+enum packet_stage tx_stage = SETUP;
 /*
  * TIM3 Interrupt Handler: Tx cycle
  */
 void TIM3_IRQHandler(void) {
-	if (tx_stage == NONE) {
-		LL_GPIO_SetOutputPin(GPIOA, LL_GPIO_PIN_7);
-	} else {
-		LL_GPIO_ResetOutputPin(GPIOA, LL_GPIO_PIN_7);
-	}
 	switch (tx_stage) {
-	case NONE:
+	case SETUP:
 		LL_GPIO_SetOutputPin(GPIOA, tx_pin); // just make sure we're on HI
-		if (tx_seek > tx_buf + tx_len) { // if we're done with our data, stop
-			tx_len = 0;
-			LL_TIM_DisableCounter(tx_timer);
-			// do something with tx_seek ?
-			break; // probably not necessary but it feels safer to wait a cycle before checking for more data
-		}
-		if (tx_len > 0) {
-			tx_stage = START;
-		}
 		break;
 	case START: // 1 cycle of LO
 		LL_GPIO_ResetOutputPin(GPIOA, tx_pin);
@@ -155,9 +147,13 @@ void TIM3_IRQHandler(void) {
 		tx_parity = 0xFF;
 		tx_stage = STOP;
 		break;
-	case STOP: // 2 cycles of HI (1 as STOP, 1 as NONE)
+	case STOP: // 1 cycle HI
 		LL_GPIO_SetOutputPin(GPIOA, tx_pin);
-		tx_stage = NONE;
+		if (tx_seek > tx_buf + tx_len) { // if we're done with our data, stop
+			tx_len = 0;
+			LL_TIM_DisableCounter(tx_timer);
+		}
+		tx_stage = START;
 		break;
 	default: // some kind of error ? maybe jump into an error handler ?
 		break;
@@ -166,14 +162,66 @@ void TIM3_IRQHandler(void) {
 }
 
 
-uint8_t rx_mask = 0x01;
-enum packet_stage rx_stage = NONE;
+uint8_t rx_bit = 0;
+uint8_t rx_parity = 0;
+enum packet_stage rx_stage = SETUP;
 void *rx_bufptr;
 /*
  * TIM4 Interrupt Handler: Rx cycle
+ * currently operating on the assumption of 8 data bits plus parity
  */
 void TIM4_IRQHandler(void) {
-	LL_GPIO_TogglePin(GPIOA, rx_pin);
+	switch (rx_stage) {
+	case SETUP: // use this stage to wait a half-cycle for rx reads
+		Set_BaudRate(rx_timer, BAUD_RATE);
+		rx_stage = START;
+		break;
+	case START:
+		rx_bit = 0;
+		rx_parity = 0x00;
+		rx_stage = DATA;
+		break;
+	case DATA:
+		uint8_t rx_data = LL_GPIO_IsInputPinSet(GPIOA, rx_pin) << rx_bit;
+		*rx_seek |= rx_data;
+		if (rx_data) {
+			++rx_parity;
+		}
+		++rx_bit;
+		if (rx_bit > 7) {
+			rx_stage = PARITY;
+		}
+		break;
+	case PARITY:
+		// check it or whatever
+		rx_stage = STOP;
+		break;
+	case STOP:
+		rx_stage = SETUP;
+		LL_TIM_DisableCounter(rx_timer);
+		break;
+	default:
+		break;
+
+	}
 	LL_TIM_ClearFlag_UPDATE(TIM4);
+}
+
+
+/*
+ *	Rx detected
+ */
+void EXTI9_5_IRQHandler(void) {
+	// some conditional to check if its the rx pin would be thorough
+	if(!LL_TIM_IsEnabledCounter(rx_timer)) { // start up the rx clock
+		rx_stage = SETUP;
+		rx_seek = rx_buf;
+		Set_BaudRate(rx_timer, 2*BAUD_RATE);
+		LL_TIM_GenerateEvent_UPDATE(rx_timer);
+		LL_TIM_EnableCounter(rx_timer);
+	} else { // rx'ing, so ignore
+
+	}
+	LL_EXTI_ClearFlag_0_31(rx_exti);
 }
 

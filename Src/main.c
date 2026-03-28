@@ -39,6 +39,8 @@ int main(void)
 	LL_PWR_DisableUCPDDeadBattery();
 
 	SystemClock_Config();
+
+	// maybe some of this should be in the uart.c
 	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
 	LL_APB1_GRP1_EnableClock(tx_busclk);
 	LL_APB1_GRP1_EnableClock(rx_busclk);
@@ -47,9 +49,9 @@ int main(void)
 
 	// do nothing, all the juice happens from timer interrupts
 	while(1) {
-		LL_mDelay(500);
+		LL_mDelay(2000);
 		char msg[] = "laputan machine";
-		UART_TransmitMessageAsync(msg, strlen(msg));
+		// UART_TransmitMessageAsync(msg, strlen(msg));
 	};
 }
 
