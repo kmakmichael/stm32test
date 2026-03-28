@@ -152,7 +152,7 @@ void TIM3_IRQHandler(void) {
 		break;
 	case STOP: // 1 cycle HI
 		LL_GPIO_SetOutputPin(GPIOA, tx_pin);
-		if (tx_seek > tx_buf + tx_len) { // if we're done with our data, stop
+		if (tx_seek >= tx_buf + tx_len) { // if we're done with our data, stop
 			tx_len = 0;
 			LL_TIM_DisableCounter(tx_timer);
 		}
