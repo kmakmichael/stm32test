@@ -17,6 +17,7 @@ extern "C" {
 
 #include <stdint.h> // should i be using inttypes.h ?
 #include <stdlib.h>
+#include <string.h>
 
 #include "stm32g4xx_ll_tim.h"
 #include "stm32g4xx_ll_gpio.h"
@@ -30,9 +31,7 @@ extern "C" {
 #define rx_pin LL_GPIO_PIN_11 // CN7 pin 2
 
 void UART_Setup(void);
-void UART_TransmitMessageAsync(void *buffer, uint8_t length);
-void UART_TransmitByte(uint8_t b); // temp
-void UART_RecvMessageAsync(void *buffer, uint8_t length);
+void UART_TransmitMessageAsync(const char *buffer);
 
 // Interrupt handlers
 void UART4_IRQHandler(void);

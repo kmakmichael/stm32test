@@ -47,10 +47,8 @@ int main(void)
 	UART_Setup();
 
 	while(1) {
-		LL_mDelay(100);
-		UART_TransmitByte('g');
-		// char msg[] = "laputan machine";
-		// UART_TransmitMessageAsync(msg, strlen(msg));
+		LL_mDelay(500);
+		UART_TransmitMessageAsync("laputan machine");
 	};
 }
 

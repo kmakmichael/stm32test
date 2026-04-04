@@ -2,8 +2,6 @@
 
 
 void GPIO_Setup();
-void Timer_Setup();
-void Set_BaudRate(TIM_TypeDef *timer, uint32_t baud);
 
 // eventually can be variable or even set by the other transmitter
 static const uint32_t BAUD_RATE = 9600;
@@ -25,12 +23,10 @@ void UART_Setup() {
 	LL_USART_Init(uart_reg, &initStruct);
 	LL_USART_ClockInit(uart_reg, &clkInitStruct);
 	// LL_USART_SetAutoBaudRateMode();
-	LL_USART_Enable(uart_reg);
-	LL_USART_EnableDirectionTx(uart_reg);
 	// LL_USART_EnableDirectionRx(usart_reg);
-	LL_USART_SetTransferDirection(uart_reg, LL_USART_DIRECTION_TX); // LL_USART_DIRECTION_TX_RX
+	LL_USART_Enable(uart_reg);
+	// LL_USART_SetTransferDirection(uart_reg, LL_USART_DIRECTION_TX); // LL_USART_DIRECTION_TX_RX
 	// DMA setup goes here
-	// TE bit for idle first transmission
 }
 
 void GPIO_Setup() {
@@ -51,32 +47,35 @@ void GPIO_Setup() {
 }
 
 
-// probably should return that ErrorStatus struct the other functions do
-// if you're using void then you have to consider the size of different data types in bufsize
-// or leave it up to the caller ?
-void UART_TransmitMessageAsync(void *buffer, uint8_t length) {
-	/*
-	tx_buf = buffer; // i guess you have to pray nobody messes with your buffer while you're transmitting ? maybe copy it instead ?
+/**
+  * @brief  Send null-terminated message (array of characters) via UART
+  * @param  buffer message to send
+  * @retval None
+  */
+const char *tx_buf;
+char *tx_seek = "\0";
+void UART_TransmitMessageAsync(const char *buffer) {
+	size_t len = strlen(buffer) + 1;
+	tx_buf = memcpy(malloc(len), buffer, len);
 	tx_seek = tx_buf;
-	tx_len = length;
-	tx_stage = START;
-	LL_TIM_GenerateEvent_UPDATE(rx_timer);
-	LL_TIM_EnableCounter(tx_timer);
-	*/
-}
-
-void UART_TransmitByte(uint8_t b) {
-	LL_USART_TransmitData8(uart_reg, b);
-}
-
-
-// probably an interrupt actually
-void UART_RecvMessageAsync(void *buffer, uint8_t length) {
-
+	LL_USART_TransmitData8(uart_reg, *tx_seek);
+	LL_USART_EnableDirectionTx(uart_reg);
+	LL_USART_EnableIT_TC(uart_reg);
 }
 
 
 void UART4_IRQHandler(void) {
+	if (LL_USART_IsActiveFlag_TC(uart_reg)) {
+		if (*tx_seek != 0x00) {
+			++tx_seek;
+			LL_USART_TransmitData8(uart_reg, *tx_seek);
+		} else { // stop transmission
+			LL_USART_DisableDirectionTx(uart_reg);
+			LL_USART_DisableIT_TC(uart_reg);
+			free(tx_buf);
+		}
+		LL_USART_ClearFlag_TC(uart_reg);
+	}
 }
 
 
