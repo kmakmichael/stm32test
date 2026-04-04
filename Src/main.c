@@ -35,21 +35,20 @@ int main(void)
 	/* MPU Setup */
 	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
 	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
+	// uart
+	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOC);
+	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_UART4);
+	LL_RCC_SetUARTClockSource(LL_RCC_UART4_CLKSOURCE_SYSCLK);
 	NVIC_SetPriorityGrouping((uint32_t)0x00000003); // Priority Group 4
 	LL_PWR_DisableUCPDDeadBattery();
 
 	SystemClock_Config();
 
-	// maybe some of this should be in the uart.c
-	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
-	LL_APB1_GRP1_EnableClock(tx_busclk);
-	LL_APB1_GRP1_EnableClock(rx_busclk);
-
 	UART_Setup();
 
-	// do nothing, all the juice happens from timer interrupts
 	while(1) {
-		LL_mDelay(500);
+		LL_mDelay(100);
+		UART_TransmitByte('g');
 		// char msg[] = "laputan machine";
 		// UART_TransmitMessageAsync(msg, strlen(msg));
 	};

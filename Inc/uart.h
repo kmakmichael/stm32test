@@ -20,38 +20,22 @@ extern "C" {
 
 #include "stm32g4xx_ll_tim.h"
 #include "stm32g4xx_ll_gpio.h"
-#include "stm32g4xx_ll_exti.h"
+#include "stm32g4xx_ll_usart.h"
 
 
-#define tx_timer TIM3
-#define tx_irqn TIM3_IRQn
-#define tx_busclk LL_APB1_GRP1_PERIPH_TIM3
-#define tx_pin LL_GPIO_PIN_5
-#define rx_timer TIM4
-#define rx_irqn TIM4_IRQn
-#define rx_busclk LL_APB1_GRP1_PERIPH_TIM4
-#define rx_pin LL_GPIO_PIN_6
-#define rx_exti LL_EXTI_LINE_6
-#define RX_BUFSIZE 256
-
-
-enum packet_stage {
-	SETUP, // not transmitting anything
-	START, // sending the start frame
-	DATA, // data
-	PARITY, // parity bit
-	STOP // stop bit
-};
-
+#define uart_reg UART4
+#define uart_irqn UART4_IRQn
+#define pin_gpio GPIOC
+#define tx_pin LL_GPIO_PIN_10 // CN7 pin 1
+#define rx_pin LL_GPIO_PIN_11 // CN7 pin 2
 
 void UART_Setup(void);
 void UART_TransmitMessageAsync(void *buffer, uint8_t length);
+void UART_TransmitByte(uint8_t b); // temp
 void UART_RecvMessageAsync(void *buffer, uint8_t length);
 
 // Interrupt handlers
-void TIM3_IRQHandler(void);
-void TIM4_IRQHandler(void);
-void EXTI9_5_IRQHandler(void);
+void UART4_IRQHandler(void);
 
 #ifdef __cplusplus
 }
