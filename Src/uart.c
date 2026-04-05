@@ -137,6 +137,7 @@ void UART4_IRQHandler(void) {
 		transmitting = 0;
 		LL_USART_ClearFlag_TC(uart_reg);
 		LL_USART_DisableIT_TC(uart_reg);
+		free(tx_buf);
 	}
 }
 
