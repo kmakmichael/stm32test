@@ -49,10 +49,9 @@ int main(void)
 
 	UART_Setup();
 
-	uint16_t count = 0;
 	while(1) {
 		LL_mDelay(1000);
-		UART_TransmitMessageDMA("laputan machine");
+		UART_TransmitMessageAsync("laputan machine");
 	};
 }
 

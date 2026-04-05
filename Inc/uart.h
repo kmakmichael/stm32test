@@ -36,9 +36,11 @@ extern "C" {
 #define rx_dma LL_DMA_CHANNEL_2
 
 void UART_Setup(void);
-void UART_TransmitMessageDMA(const char *buffer);
+ErrorStatus UART_TransmitMessageDMA(const char *buffer);
+ErrorStatus UART_TransmitMessageAsync(const char *buffer);
 
 // Interrupt handlers
+void UART4_IRQHandler(void);
 void DMA1_CH1_IRQHandler(void);
 
 #ifdef __cplusplus

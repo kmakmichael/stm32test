@@ -75,14 +75,45 @@ void GPIO_Setup() {
   * @param  buffer message to send
   * @retval None
   */
-void UART_TransmitMessageDMA(const char *buffer) {
+uint8_t transmitting = 0;
+ErrorStatus UART_TransmitMessageDMA(const char *buffer) {
+	while (transmitting);
 	LL_DMA_SetMemoryAddress(dma_instance, tx_dma, (uint32_t) buffer);
 	LL_DMA_SetDataLength(dma_instance, tx_dma, strlen(buffer)+1);
 	LL_DMA_EnableIT_TC(dma_instance, tx_dma);
 	LL_DMA_EnableIT_TE(dma_instance, tx_dma);
 	LL_USART_ClearFlag_TC(uart_reg);
+	LL_USART_EnableIT_TC(uart_reg);
 	LL_DMA_EnableChannel(dma_instance, tx_dma);
 	LL_USART_RequestTxDataFlush(uart_reg);
+	transmitting = 1;
+	while (transmitting);
+	return SUCCESS;
+}
+
+/**
+  * @brief  Send null-terminated message (array of characters) via UART
+  * @param  buffer message to send
+  * @retval None
+  */
+const char *tx_buf;
+char *tx_seek = '\0';
+ErrorStatus UART_TransmitMessageAsync(const char *buffer) {
+	if (transmitting) {
+		return ERROR; // still transmitting
+	}
+	uint8_t len = strlen(buffer) + 1;
+	tx_buf = memcpy(malloc(len), buffer, len);
+	LL_DMA_SetMemoryAddress(dma_instance, tx_dma, (uint32_t) tx_buf);
+	LL_DMA_SetDataLength(dma_instance, tx_dma, len);
+	LL_DMA_EnableIT_TC(dma_instance, tx_dma);
+	LL_DMA_EnableIT_TE(dma_instance, tx_dma);
+	LL_USART_ClearFlag_TC(uart_reg);
+	LL_USART_EnableIT_TC(uart_reg);
+	LL_DMA_EnableChannel(dma_instance, tx_dma);
+	LL_USART_RequestTxDataFlush(uart_reg);
+	transmitting = 1;
+	return SUCCESS;
 }
 
 
@@ -97,6 +128,15 @@ void DMA1_CH1_IRQHandler(void) {
 		while (1) {
 			// whoops
 		}
+	}
+}
+
+void UART4_IRQHandler(void) {
+	if (LL_USART_IsActiveFlag_TC(uart_reg)) {
+		// done transmitting
+		transmitting = 0;
+		LL_USART_ClearFlag_TC(uart_reg);
+		LL_USART_DisableIT_TC(uart_reg);
 	}
 }
 
