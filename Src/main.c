@@ -39,6 +39,9 @@ int main(void)
 	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOC);
 	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_UART4);
 	LL_RCC_SetUARTClockSource(LL_RCC_UART4_CLKSOURCE_SYSCLK);
+	// dma
+	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMAMUX1);
+	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);
 	NVIC_SetPriorityGrouping((uint32_t)0x00000003); // Priority Group 4
 	LL_PWR_DisableUCPDDeadBattery();
 
@@ -46,9 +49,10 @@ int main(void)
 
 	UART_Setup();
 
+	uint16_t count = 0;
 	while(1) {
-		LL_mDelay(500);
-		UART_TransmitMessageAsync("laputan machine");
+		LL_mDelay(1000);
+		UART_TransmitMessageDMA("laputan machine");
 	};
 }
 

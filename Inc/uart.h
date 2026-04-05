@@ -22,19 +22,24 @@ extern "C" {
 #include "stm32g4xx_ll_tim.h"
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_usart.h"
+#include "stm32g4xx_ll_dma.h"
 
 
 #define uart_reg UART4
 #define uart_irqn UART4_IRQn
 #define pin_gpio GPIOC
+#define dma_instance DMA1
+#define dma_tx_irqn DMA1_Channel1_IRQn
 #define tx_pin LL_GPIO_PIN_10 // CN7 pin 1
+#define tx_dma LL_DMA_CHANNEL_1
 #define rx_pin LL_GPIO_PIN_11 // CN7 pin 2
+#define rx_dma LL_DMA_CHANNEL_2
 
 void UART_Setup(void);
-void UART_TransmitMessageAsync(const char *buffer);
+void UART_TransmitMessageDMA(const char *buffer);
 
 // Interrupt handlers
-void UART4_IRQHandler(void);
+void DMA1_CH1_IRQHandler(void);
 
 #ifdef __cplusplus
 }
