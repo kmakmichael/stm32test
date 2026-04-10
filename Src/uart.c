@@ -5,7 +5,7 @@ void GPIO_Setup(void);
 void DMA_Setup(void);
 
 // eventually can be variable or even set by the other transmitter
-static const uint32_t BAUD_RATE = 9600;
+static const uint32_t BAUD_RATE = 9600 * 12;
 
 
 void UART_Setup() {
@@ -39,6 +39,7 @@ void DMA_Setup() {
 
 	LL_DMA_InitTypeDef dmaInitStruct = {};
 	LL_DMA_StructInit(&dmaInitStruct);
+	// tx setup
 	dmaInitStruct.Direction = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
 	// memory to copy from
 	dmaInitStruct.MemoryOrM2MDstDataSize = LL_DMA_MDATAALIGN_BYTE;
@@ -79,7 +80,7 @@ uint8_t transmitting = 0;
 ErrorStatus UART_TransmitMessageDMA(const char *buffer) {
 	while (transmitting);
 	LL_DMA_SetMemoryAddress(dma_instance, tx_dma, (uint32_t) buffer);
-	LL_DMA_SetDataLength(dma_instance, tx_dma, strlen(buffer)+1);
+	LL_DMA_SetDataLength(dma_instance, tx_dma, (uint32_t) strlen(buffer)+1);
 	LL_DMA_EnableIT_TC(dma_instance, tx_dma);
 	LL_DMA_EnableIT_TE(dma_instance, tx_dma);
 	LL_USART_ClearFlag_TC(uart_reg);
@@ -100,12 +101,12 @@ const char *tx_buf;
 char *tx_seek = '\0';
 ErrorStatus UART_TransmitMessageAsync(const char *buffer) {
 	if (transmitting) {
-		return ERROR; // still transmitting
+		return ERROR; // still transmitting. consider a more useful retval or a fifo/buffer for queue'd up data transmissions?
 	}
-	uint8_t len = strlen(buffer) + 1;
+	size_t len = strlen(buffer) + 1;
 	tx_buf = memcpy(malloc(len), buffer, len);
 	LL_DMA_SetMemoryAddress(dma_instance, tx_dma, (uint32_t) tx_buf);
-	LL_DMA_SetDataLength(dma_instance, tx_dma, len);
+	LL_DMA_SetDataLength(dma_instance, tx_dma, (uint32_t) len);
 	LL_DMA_EnableIT_TC(dma_instance, tx_dma);
 	LL_DMA_EnableIT_TE(dma_instance, tx_dma);
 	LL_USART_ClearFlag_TC(uart_reg);
@@ -113,7 +114,7 @@ ErrorStatus UART_TransmitMessageAsync(const char *buffer) {
 	LL_DMA_EnableChannel(dma_instance, tx_dma);
 	LL_USART_RequestTxDataFlush(uart_reg);
 	transmitting = 1;
-	return SUCCESS;
+	return SUCCESS; // too early to return this? do we need an enum for error/busy/success ?
 }
 
 
@@ -133,11 +134,15 @@ void DMA1_CH1_IRQHandler(void) {
 
 void UART4_IRQHandler(void) {
 	if (LL_USART_IsActiveFlag_TC(uart_reg)) {
-		// done transmitting
-		transmitting = 0;
 		LL_USART_ClearFlag_TC(uart_reg);
 		LL_USART_DisableIT_TC(uart_reg);
+		/* 	this may cause some memory leakage if tx_buf is re-alloc'd before the tranmission is finished
+		 *  ideally, that just wouldn't happen because of the transmitting flag, but a thing to keep
+		 *  in mind for future changes, especially if you ditch the flag.
+		 */
 		free(tx_buf);
+		// done transmitting
+		transmitting = 0;
 	}
 }
 
