@@ -23,9 +23,6 @@
   #warning "FPU is not initialized, but the project is compiling for an FPU. Please initialize the FPU before use."
 #endif
 
-uint32_t BAUD_RATE = 4; //9600;
-uint32_t HCLK_FREQ = 170000000;
-
 void SystemClock_Config(void);
 void GPIO_Setup(void);
 void Timer_Setup(void);
@@ -44,11 +41,10 @@ int main(void)
 
 	SystemClock_Config();
 
-	UART_Setup();
-
 	while(1) {
-		LL_mDelay(500);
-		UART_TransmitMessageAsync("laputan machine");
+		LL_mDelay(200);
+		// pixels[0].Red += 16;
+		PIX_Write();
 	};
 }
 

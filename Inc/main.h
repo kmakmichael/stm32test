@@ -17,7 +17,11 @@ extern "C" {
 #include "stm32g4xx_ll_gpio.h"
 #include "stm32g4xx_ll_tim.h"
 
-#include "uart.h"
+#include "pixel.h"
+
+
+#define HCLK_FREQ 170000000
+
 
 #ifdef __cplusplus
 }
