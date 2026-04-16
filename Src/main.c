@@ -44,10 +44,11 @@ int main(void)
 	SystemClock_Config();
 
 	PIX_Init();
+	PIX_Write();
 	while(1) {
 		LL_mDelay(100);
 		// pixels[0].Red += 16;
-		PIX_Write();
+		// PIX_Write();
 	};
 }
 
