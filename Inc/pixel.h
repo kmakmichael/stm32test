@@ -17,7 +17,11 @@
 extern "C" {
 #endif
 
-#include <stdint.h> // should i be using inttypes.h ?
+#include <stdint.h>
+#include <stddef.h>
+
+#include "stm32g4xx.h"
+#include "stm32g4xx_ll_gpio.h"
 
 // not contiguous, so how are we gonna DMA it? does that matter ?
 typedef struct
@@ -27,10 +31,14 @@ typedef struct
   uint8_t Blue;
 } Pixel;
 
-#define NUM_PIXELS 1 //30
+// PA8 alt 13 = HRTIM_CHA1 (CN10 p23)
+#define PIX_GPIO GPIOA
+#define PIX_PINOUT LL_GPIO_PIN_8
 
-void PIX_Init(void);
-void PIX_Write(void);
+#define NUM_PIXELS 8 //30
+
+ErrorStatus PIX_Init(void);
+ErrorStatus PIX_Write(void);
 
 #ifdef __cplusplus
 }

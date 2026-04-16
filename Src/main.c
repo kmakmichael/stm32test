@@ -24,25 +24,28 @@
 #endif
 
 void SystemClock_Config(void);
-void GPIO_Setup(void);
-void Timer_Setup(void);
 
 int main(void)
 {
 	/* MPU Setup */
 	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
 	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_PWR);
-	// uart
+	/* uart
 	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOC);
 	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_UART4);
 	LL_RCC_SetUARTClockSource(LL_RCC_UART4_CLKSOURCE_SYSCLK);
+	*/
+	/* HRTIM */
+	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_HRTIM1);
+	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
 	NVIC_SetPriorityGrouping((uint32_t)0x00000003); // Priority Group 4
 	LL_PWR_DisableUCPDDeadBattery();
 
 	SystemClock_Config();
 
+	PIX_Init();
 	while(1) {
-		LL_mDelay(200);
+		LL_mDelay(100);
 		// pixels[0].Red += 16;
 		PIX_Write();
 	};
