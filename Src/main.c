@@ -35,6 +35,9 @@ int main(void)
 	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_UART4);
 	LL_RCC_SetUARTClockSource(LL_RCC_UART4_CLKSOURCE_SYSCLK);
 	*/
+	/* DMA */
+	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMAMUX1);
+	LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);
 	/* HRTIM */
 	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_HRTIM1);
 	LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
@@ -44,11 +47,10 @@ int main(void)
 	SystemClock_Config();
 
 	PIX_Init();
-	PIX_Write();
+	LL_mDelay(1);
 	while(1) {
-		LL_mDelay(100);
-		// pixels[0].Red += 16;
-		// PIX_Write();
+	  LL_mDelay(2);
+	  PIX_Write();
 	};
 }
 
